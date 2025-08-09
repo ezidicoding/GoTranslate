@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>GoTranslate - وضع المحادثة</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --app-bg: #f8f9fa;
+            --text-primary: #202124;
+            --text-secondary: #5f6368;
+            --primary-color: #006a6a;
+            --secondary-color: #e0eef0;
+            --border-color: #dfe1e5;
+            --white: #ffffff;
+            --danger-color: #d93025;
+            --user-bubble-bg: #e0f2f1;
+            --partner-bubble-bg: #f1f3f4;
+        }
+        html { font-size: 16px; }
+        body {
+            margin: 0;
+            font-family: 'Noto Kufi Arabic', sans-serif;
+            background-color: var(--app-bg);
+            min-height: 100vh;
+            direction: rtl;
+            display: flex;
+            flex-direction: column;
+        }
+        .app-container {
+            width: 100%;
+            height: 100vh;
+            background-color: var(--app-bg);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        header {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            gap: 16px;
+            flex-shrink: 0;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--white);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .profile-pic { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+        .title { font-size: 1.25rem; font-weight: 500; color: var(--text-primary); margin: 0 auto 0 0; }
+        main {
+            flex-grow: 1;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+        #conversation-view { flex-grow: 1; display: flex; flex-direction: column; gap: 12px; }
+        .message-bubble {
+            display: flex;
+            flex-direction: column;
+            padding: 12px 16px;
+            border-radius: 20px;
+            max-width: 85%;
+            word-wrap: break-word;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeIn 0.4s forwards;
+        }
+        @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+        .message-bubble p { margin: 0; line-height: 1.6; }
+        .message-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .original-speech { font-size: 1rem; font-weight: 500; color: var(--text-primary); }
+        .translated-speech { font-size: 0.9rem; color: var(--text-secondary); }
+        .play-audio-btn { background: none; border: none; color: var(--text-secondary); font-size: 1.1rem; cursor: pointer; padding: 0 5px; opacity: 0.7; transition: opacity: 0.2s; }
+        .play-audio-btn:hover { opacity: 1; }
+        .user-message { background-color: var(--user-bubble-bg); align-self: flex-end; border-bottom-right-radius: 5px; }
+        .partner-message { background-color: var(--partner-bubble-bg); align-self: flex-start; border-bottom-left-radius: 5px; }
+        #status-message { text-align: center; color: var(--text-primary); padding: 10px; font-size: 1rem; font-weight: 500; background-color: var(--app-bg); flex-shrink: 0; min-height: 24px; }
+        .controls-container { display: flex; justify-content: space-around; align-items: center; gap: 10px; padding: 16px; background-color: var(--white); border-top: 1px solid var(--border-color); flex-shrink: 0; }
+        .lang-control { display: flex; flex-direction: column; align-items: center; gap: 12px; flex-grow: 1; }
+        .lang-btn { width: 100%; background-color: var(--white); border: 1px solid var(--border-color); border-radius: 20px; padding: 10px 15px; font-size: 1rem; font-weight: 500; font-family: inherit; color: var(--text-primary); text-align: center; cursor: pointer; appearance: none; }
+        #swap-btn { background: none; border: none; cursor: pointer; padding: 5px; font-size: 1.2rem; color: var(--text-secondary); transition: transform 0.3s ease; align-self: flex-end; margin-bottom: 18px; }
+        #swap-btn:active { transform: rotate(180deg); }
+        .mic-btn { width: 60px; height: 60px; background-color: var(--primary-color); color: var(--white); font-size: 1.8rem; cursor: pointer; border-radius: 50%; border: none; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 8px rgba(0,0,0,0.15); transition: background-color 0.3s ease, transform 0.2s ease; }
+        .mic-btn:disabled { background-color: #ccc; cursor: not-allowed; opacity: 0.7; }
+        .mic-btn:active:not(:disabled) { transform: scale(0.95); }
+        .mic-btn.is-listening { background-color: var(--danger-color); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(217, 48, 37, 0); } 100% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0); } }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <img src="https://i.imgur.com/uX1y0c8.png" alt="Profile" class="profile-pic">
+            <h1 class="title">GoTranslate - محادثة</h1>
+        </header>
+        <main id="main-content">
+             <div id="conversation-view"></div>
+        </main>
+        <div id="status-message">اضغط على الميكروفون لبدء التحدث</div>
+        <div class="controls-container">
+            <div class="lang-control">
+                <select id="lang1-select" class="lang-btn"></select>
+                <button id="mic-btn-1" class="mic-btn" title="التحدث باللغة الأولى"><i class="fa-solid fa-microphone"></i></button>
+            </div>
+            <button id="swap-btn" title="تبديل اللغات"><i class="fa-solid fa-right-left"></i></button>
+            <div class="lang-control">
+                <select id="lang2-select" class="lang-btn"></select>
+                <button id="mic-btn-2" class="mic-btn" title="التحدث باللغة الثانية"><i class="fa-solid fa-microphone"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const lang1Select = document.getElementById('lang1-select');
+        const lang2Select = document.getElementById('lang2-select');
+        const micBtn1 = document.getElementById('mic-btn-1');
+        const micBtn2 = document.getElementById('mic-btn-2');
+        const swapBtn = document.getElementById('swap-btn');
+        const statusMessage = document.getElementById('status-message');
+        const conversationView = document.getElementById('conversation-view');
+        const mainContent = document.getElementById('main-content');
+        
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition;
+
+        let activeMic = null;
+        let sessionConfig = {};
+
+        const languages = {
+            'ar': 'العربية', 'en': 'الإنجليزية', 'nl': 'الهولندية', 'fr': 'الفرنسية', 'de': 'الألمانية', 'es': 'الإسبانية',
+            'it': 'الإيطالية', 'ja': 'اليابانية', 'ko': 'الكورية', 'pt': 'البرتغالية', 'ru': 'الروسية', 'zh-CN': 'الصينية (مبسطة)',
+            'tr': 'التركية', 'hi': 'الهندية'
+        };
+
+        function populateLanguages() {
+            const sortedLangs = Object.entries(languages).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
+            sortedLangs.forEach(([code, name]) => {
+                lang1Select.add(new Option(name, code));
+                lang2Select.add(new Option(name, code));
+            });
+            lang1Select.value = 'ar';
+            lang2Select.value = 'en';
+        }
+
+        function swapLanguages() {
+            const tempLang = lang1Select.value;
+            lang1Select.value = lang2Select.value;
+            lang2Select.value = tempLang;
+            statusMessage.textContent = `تم تبديل اللغات`;
+        }
+        
+        async function translateAndDisplay(originalText, sourceLang, targetLang, isUser1) {
+            statusMessage.textContent = 'جاري الترجمة...';
+            const bubble = document.createElement('div');
+            bubble.classList.add('message-bubble', isUser1 ? 'user-message' : 'partner-message');
+            
+            const playBtnId = `play-btn-${Date.now()}`;
+            bubble.innerHTML = `
+                <div class="message-header">
+                    <p class="original-speech">${originalText}</p>
+                    <button id="${playBtnId}" class="play-audio-btn" title="إعادة تشغيل الصوت المترجم">
+                       <i class="fa-solid fa-volume-high"></i>
+                    </button>
+                </div>
+                <p class="translated-speech"><i>...</i></p>
+            `;
+            conversationView.appendChild(bubble);
+            mainContent.scrollTop = mainContent.scrollHeight;
+
+            const apiUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(originalText)}`;
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                const translatedText = data[0].map(item => item[0]).join('');
+                bubble.querySelector('.translated-speech').textContent = translatedText;
+                document.getElementById(playBtnId).onclick = () => speakText(translatedText, targetLang);
+                speakText(translatedText, targetLang);
+            } catch (error) {
+                console.error('Error during translation:', error);
+                bubble.querySelector('.translated-speech').textContent = 'فشلت الترجمة.';
+            } finally {
+                statusMessage.textContent = 'اضغط على الميكروفون للتحدث';
+            }
+        }
+
+        function speakText(text, langCode) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = langCode;
+                utterance.onerror = (e) => console.error("Speech Synthesis Error", e);
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+        
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onstart = () => {
+                if (activeMic) activeMic.classList.add('is-listening');
+                statusMessage.textContent = `استمع الآن...`;
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                if (transcript) {
+                    translateAndDisplay(transcript, sessionConfig.sourceLang, sessionConfig.targetLang, sessionConfig.isUser1);
+                }
+            };
+
+            recognition.onend = () => {
+                // دائمًا قم بإعادة تعيين الواجهة إلى الحالة الافتراضية بعد انتهاء الاستماع
+                if (activeMic) activeMic.classList.remove('is-listening');
+                statusMessage.textContent = 'اضغط على الميكروفون لبدء التحدث';
+                activeMic = null;
+                micBtn1.disabled = false;
+                micBtn2.disabled = false;
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error', event.error);
+                let errorMsg = 'حدث خطأ في التعرف على الصوت.';
+                if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                    errorMsg = 'الرجاء السماح بالوصول إلى الميكروفون.';
+                } else if (event.error === 'no-speech') {
+                    errorMsg = 'لم يتم سماع أي صوت. حاول مرة أخرى.';
+                }
+                statusMessage.textContent = errorMsg;
+                // تأكد من أن onend سيتم استدعاؤه لتنظيف الواجهة
+            };
+
+            function toggleRecognition(config) {
+                // إذا كان الميكروفون المحدد نشطًا بالفعل، قم بإيقافه
+                if (activeMic === config.micButton) {
+                    recognition.stop();
+                    return;
+                }
+                
+                // إذا كان هناك ميكروفون آخر نشط، أوقفه (حالة نادرة ولكنها آمنة)
+                if (activeMic) {
+                    recognition.stop();
+                }
+
+                // بدء جلسة جديدة
+                sessionConfig = config;
+                activeMic = config.micButton;
+                recognition.lang = config.sourceLang;
+
+                micBtn1.disabled = (activeMic !== micBtn1);
+                micBtn2.disabled = (activeMic !== micBtn2);
+
+                recognition.start();
+            }
+
+            micBtn1.addEventListener('click', () => toggleRecognition({ micButton: micBtn1, sourceLang: lang1Select.value, targetLang: lang2Select.value, isUser1: true }));
+            micBtn2.addEventListener('click', () => toggleRecognition({ micButton: micBtn2, sourceLang: lang2Select.value, targetLang: lang1Select.value, isUser1: false }));
+
+        } else {
+            micBtn1.disabled = true;
+            micBtn2.disabled = true;
+            statusMessage.innerHTML = 'عذراً, متصفحك لا يدعم<br>التعرف على الصوت.';
+        }
+
+        swapBtn.addEventListener('click', swapLanguages);
+        populateLanguages();
+    });
+    </script>
+</body>
+</html>
